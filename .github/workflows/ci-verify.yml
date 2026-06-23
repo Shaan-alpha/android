@@ -8,8 +8,12 @@ on: # yamllint disable-line rule:truthy
         description: "Branch to verify"
         required: true
         default: "fix-media-widget-compose"
+      lint:
+        description: "Run ktlint + unit tests"
+        required: false
+        default: "true"
       screenshots:
-        description: "Regenerate screenshots (heavy)"
+        description: "Regenerate media player screenshots"
         required: false
         default: "true"
 
@@ -30,11 +34,11 @@ jobs:
           mock-google-services: "true"
 
       - name: ktlint
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && github.event.inputs.lint != 'false' }}
         run: ./gradlew ktlintCheck :build-logic:convention:ktlintCheck --continue
 
       - name: Unit tests
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && github.event.inputs.lint != 'false' }}
         run: ./gradlew testDebugUnitTest :app:testFullDebugUnitTest
 
       - name: Free disk space
@@ -44,9 +48,12 @@ jobs:
           sudo docker system prune -af || true
           df -h
 
-      - name: Update screenshots
+      - name: Update screenshots (media player only)
         if: ${{ !cancelled() && github.event.inputs.screenshots != 'false' }}
-        run: ./gradlew :app:updateFullDebugScreenshotTest --no-daemon
+        run: >
+          ./gradlew :app:updateFullDebugScreenshotTest
+          --tests "*MediaPlayerControlsWidgetConfigureScreenshotTest"
+          --no-daemon --max-workers=1
 
       - name: Commit and push screenshots
         if: ${{ !cancelled() && github.event.inputs.screenshots != 'false' }}
@@ -54,5 +61,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add .
-          git commit -m "Update screenshots" || echo "No screenshot changes"
+          git commit -m "Update media player widget screenshots" || echo "No screenshot changes"
           git push origin HEAD:${{ github.event.inputs.branch }}
